@@ -1,6 +1,8 @@
 
+from fx.exceptions import SyntaxError
 from inspect import indentsize
 from lark import Lark, Transformer as LarkTransformer
+from lark.exceptions import UnexpectedEOF, UnexpectedInput
 from .ast import And, Call, Div, Eq, Ge, Get, Gt, Lambda, Le, Lt, Mul, Neq, Not, Or, Record, Sub, Sum, Value, Variable, Array
 
 GRAMMAR = R"""
@@ -215,4 +217,7 @@ TRANSFORMER = Transformer()
 
 
 def parse(input: str):
-    return TRANSFORMER.transform(PARSER.parse(input))
+    try:
+        return TRANSFORMER.transform(PARSER.parse(input))
+    except UnexpectedEOF as error:
+        raise SyntaxError(input, what="Unexpected EOF")

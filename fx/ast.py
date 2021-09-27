@@ -11,7 +11,6 @@ NoneType = type(None)
 ValueT = TypeVar('ValueT', int, float, bool, str, NoneType)
 
 
-@dataclass
 class Expr:
     def execute(self, ctx: Context):
         raise NotImplementedError()
@@ -142,7 +141,8 @@ class BinaryOp(Expr):
 class Get(BinaryOp):
     def execute(self, ctx: Context):
         lhs = execute(ctx, self.lhs)
-        rhs = self.rhs if isinstance(self.rhs, str) else execute(ctx, self.rhs)
+        rhs = self.rhs if isinstance(
+            self.rhs, str) else str(execute(ctx, self.rhs).value)
         return lhs[rhs]
 
 

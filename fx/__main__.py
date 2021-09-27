@@ -1,4 +1,5 @@
 
+from datetime import datetime
 from fx.stdlib import std_lib
 from ast import Param
 from functools import reduce, wraps
@@ -14,6 +15,7 @@ from uuid import uuid4
 from fx.ast import Expr, Value, ValueT, Variable, execute, Array, Record
 from fx.context import Context
 from fx.parser import parse
+from fx.exceptions import SyntaxError
 
 
 def check_type(expr: Any, type_):
@@ -118,10 +120,16 @@ def hash_md5_fn(ctx: Context, value: Value[str]):
     return Value(h)
 
 
-def json_encode(ctx: Context, value):
-    from json import dumps
+def date_now_fn(ctx: Context):
+    from datetime import datetime
+    return Value(datetime.now())
+
+
+def date_format_fn(ctx: Context, format: Value[str], value: Value[datetime]):
+    format = execute(ctx, format)
     value = execute(ctx, value)
-    return Value(dumps(value))
+
+    return Value(datetime.strftime(value.value, format.value))
 
 
 ctx = Context(
@@ -139,26 +147,29 @@ ctx = Context(
         'Row': Record({
             'firstName': Value('bernardo'),
             'lastName': Value('lourenço'),
-            'email': Value('bernardo.lourenco@ua.com')
+            'email': Value('bernardo.lourenco@ua.com'),
+            'Música Preferida': Value('A minha casinha'),
         }),
-        'JSON': Record({
-            'encode': json_encode,
+        'Date': Record({
+            'now': date_now_fn,
+            'format': date_format_fn,
         })
     },
 )
 
 
-def repl(n: int):
+n = 1
+while True:
     try:
         read = input("$ ")
+        if read == '':
+            continue
         expr = parse(read)
         result = execute(ctx, expr)
         print(f"[{n}] {result}")
-    except Exception as e:
-        print(type(e))
-
-
-n = 1
-while True:
-    repl(n)
+    except SyntaxError as e:
+        print(f"Syntax Error: {e.what}")
+    except (KeyboardInterrupt, EOFError):
+        print("\nBye")
+        break
     n += 1

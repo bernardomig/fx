@@ -1,8 +1,11 @@
+from fx.exceptions import SyntaxError
+from lark.exceptions import UnexpectedInput
 import pytest
 from math import isnan
 
 from fx.ast import And, Array, Call, Eq, Ge, Get, Lambda, Mul, Neq, Not, Or, Record, Sub, Sum, Value, Variable
 from fx.parser import parse
+
 
 V = Value
 Var = Variable
@@ -155,3 +158,10 @@ def test_parsing_dot_operator():
     assert parse("a.b.c") == Get(Get(Var('a'), 'b'), 'c')
     assert parse('`a row`.`an item`') == Get(Var('a row'), 'an item')
     assert parse('a.[b].[c]') == Get(Get(Var('a'), Var('b')), Var('c'))
+
+
+def test_fail_eof_parsing():
+    with pytest.raises(SyntaxError) as ex:
+        parse("a + ")
+    assert ex.value.input == "a + "
+    assert ex.value.what == "Unexpected EOF"
