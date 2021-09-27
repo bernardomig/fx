@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "fx"
+version = "0.1.0"
+description = ""
+authors = ["Bernardo Lourenço <bernardo.martins.lourenco@everis.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+lark = "^0.11.3"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.5"
+autopep8 = "^1.5.7"
+mypy = "^0.910"
+pytest-mypy = "^0.8.1"
+devtools = "^0.7.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
