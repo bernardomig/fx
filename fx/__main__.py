@@ -7,8 +7,11 @@ from fx.context import Context
 from fx.parser import parse
 from fx.exceptions import SyntaxError
 
+from fx.stdlib import Core
 
-ctx = Context(scope={})
+ctx = Context(scope={
+    **Core,
+})
 
 n = 1
 while True:
