@@ -1,211 +1,231 @@
 from dataclasses import dataclass, field
+from operator import (add, and_, eq, ge, getitem, gt, invert, le, lt, mul, ne,
+                      or_, sub, truediv)
+from typing import Callable, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
 from _pytest.python import Class
-from fx.context import Context
-from typing import ClassVar, Dict, Generic, List, NewType, TypeVar, Union
-from datetime import datetime
 
-NoneType = type(None)
+from .context import Context
+from .value import Array as ValueArray
+from .value import Bool, Float, Int
+from .value import Lambda as ValueLambda
+from .value import Nil
+from .value import Record as ValueRecord
+from .value import Value, wrap
 
 
-ValueT = TypeVar('ValueT', int, float, bool, str, NoneType)
-
-
-class Expr:
-    def execute(self, ctx: Context):
+class Ast:
+    def execute(self, _ctx: Context) -> Value:
         raise NotImplementedError()
 
 
-def execute(ctx: Context, expr: Expr):
-    return expr.execute(ctx)
-
-
-@dataclass(frozen=True)
-class Value(Generic[ValueT], Expr):
-    value: ValueT
-
-    def __repr__(self) -> str:
-        if type(self.value) is NoneType:
-            return "nil"
-        elif type(self.value) in (int, float):
-            return str(self.value)
-        elif type(self.value) is str:
-            return '"' + self.value + '"'
-        elif type(self.value) is bool:
-            return "true" if self.value else "false"
-        else:
-            return repr(self.value)
-
-    def execute(self, ctx: Context):
-        return self
+def execute(ctx: Context, ast: Ast) -> Value:
+    return ast.execute(ctx)
 
 
 @dataclass
-class Array(Expr):
-    items: List[Expr]
+class Literal(Ast):
+    value: Value
 
-    def __getitem__(self, idx: Union[int, str]):
-        return self.items[int(idx)]
-
-    def __repr__(self):
-        return "[" + ', '.join((repr(item) for item in self.items)) + "]"
-
-    def execute(self, ctx: Context):
-        return Array(items=[execute(ctx, item) for item in self.items])
+    def execute(self, _ctx: Context) -> Value:
+        return self.value
 
 
 @dataclass
-class Record(Expr):
-    entries: Dict[str, Expr]
+class Array(Ast):
+    items: List[Ast]
 
-    def __getitem__(self, idx: str):
-        return self.entries[idx]
-
-    def __repr__(self) -> str:
-        return '[' + ', '.join((name + ': ' + repr(value) for name, value in self.entries.items())) + ']'
-
-    def execute(self, ctx: Context):
-        return Record(entries={key: execute(ctx, value) for key, value in self.entries.items()})
+    def execute(self, ctx: Context) -> Value:
+        return ValueArray(*[execute(ctx, v) for v in self.items])
 
 
 @dataclass
-class Lambda(Expr):
-    body: Expr
-    args: List[str] = field(default_factory=list)
-    kwargs: Dict[str, Expr] = field(default_factory=dict)
+class Record(Ast):
+    items: Dict[str, Ast]
 
-    def __repr__(self) -> str:
-        args = ', '.join(self.args)
-        kwargs = (
-            '; ' + ', '.join([f'{k}: ...' for k in self.kwargs.keys()])
-            if len(self.kwargs) > 0 else '')
-
-        return f'[{args}{kwargs}] -> ...'
-
-    def execute(self, ctx: Context):
-        return self
-
-    def __call__(self, ctx: Context, *args, **kwargs):
-        assert len(args) == len(self.args)
-        assert set(self.kwargs.keys()).issuperset(kwargs.keys())
-        scope = {k: v for k, v in zip(self.args, args)}
-        scope = {**scope, **self.kwargs, **kwargs}
-        inner_ctx = Context(variables={**ctx.variables, **scope})
-        return execute(inner_ctx, self.body)
+    def execute(self, ctx: Context) -> Value:
+        return ValueRecord(**{k: execute(ctx, v) for k, v in self.items.items()})
 
 
 @dataclass
-class Variable(Expr):
+class Variable(Ast):
     ident: str
 
-    def execute(self, ctx: Context):
-
-        return ctx.variables[self.ident]
-
-
-@dataclass
-class Call(Expr):
-    name: Variable
-    args: List[Expr] = field(default_factory=list)
-    kwargs: Dict[str, Expr] = field(default_factory=dict)
-
-    def execute(self, ctx: Context):
-        fn = execute(ctx, self.name)
-        return fn(ctx, *self.args, **self.kwargs)
+    def execute(self, ctx: Context) -> Value:
+        return ctx.scope[self.ident]
 
 
 @dataclass
-class UnaryOp(Expr):
-    name: ClassVar[str]
-    expr: Expr
+class FnCall(Ast):
+    name: Ast
+    args: List[Ast] = field(default_factory=list)
 
-    def execute(self, ctx: Context):
-        value = execute(ctx, self.expr)
-        return ctx.variables[self.name](ctx, value)
-
-
-@dataclass
-class BinaryOp(Expr):
-    name: ClassVar[str]
-
-    lhs: Expr
-    rhs: Expr
-
-    def execute(self, ctx: Context):
-        lhs = execute(ctx, self.lhs)
-        rhs = execute(ctx, self.rhs)
-        return ctx.variables[self.name](ctx, lhs, rhs)
+    def execute(self, ctx: Context) -> Value:
+        fn = self.name.execute(ctx)
+        args = [arg.execute(ctx) for arg in self.args]
+        return fn(*args)
 
 
 @dataclass
-class Get(BinaryOp):
-    def execute(self, ctx: Context):
+class Lambda(Ast):
+    body: Ast
+    args: List[str] = field(default_factory=list)
+
+    def execute(self, ctx: Context) -> Value:
+        return ValueLambda(ctx, self)
+
+    def __call__(self, ctx: Context, *args):
+        args = {name: arg for name, arg in zip(self.args, args)}
+        ctx = Context({**ctx.scope, **args})
+        return execute(ctx, self.body)
+
+
+@dataclass
+class Let(Ast):
+    assignments: List[Tuple[str, Ast]]
+    body: Ast
+
+    def execute(self, ctx: Context) -> Value:
+        scope = {k: execute(ctx, v) for k, v in self.assignments}
+        ctx = Context(scope={**ctx.scope, **scope})
+        return execute(ctx, self.body)
+
+
+@dataclass
+class If(Ast):
+    condition: Ast
+    true_branch: Ast
+    false_branch: Ast
+
+    def execute(self, ctx: Context) -> Value:
+        cond = execute(ctx, self.condition)
+        assert isinstance(cond, Bool)
+        return (
+            execute(ctx, self.true_branch)
+            if cond.value
+            else execute(ctx, self.false_branch))
+
+
+@dataclass
+class When(Ast):
+    value: Ast
+    matches: List[Tuple[Ast, Ast]]
+    default: Optional[Ast] = field(default=None)
+
+    def execute(self, ctx: Context) -> Value:
+        value = execute(ctx, self.value)
+
+        for compare, body in self.matches:
+            compare = execute(ctx, compare)
+            if value == compare:
+                return execute(ctx, body)
+
+        if self.default:
+            return execute(ctx, self.default)
+
+        return Nil()
+
+
+@dataclass
+class UnaryOp(Ast):
+    arg: Ast
+
+    def execute(self, ctx: Context) -> Value:
+        arg = self.arg.execute(ctx)
+        return self.__op__(arg)
+
+    def __op__(self, value: Value):
+        raise NotImplementedError()
+
+
+@dataclass
+class BinaryOp(Ast):
+    lhs: Ast
+    rhs: Ast
+
+    def execute(self, ctx: Context) -> Value:
+        lhs = self.lhs.execute(ctx)
+        rhs = self.rhs.execute(ctx)
+
+        return type(self).__op__(lhs, rhs)
+
+
+@dataclass
+class Get:
+    lhs: Ast
+    rhs: Union[str, Ast]
+
+    def execute(self, ctx: Context) -> Value:
         lhs = execute(ctx, self.lhs)
         rhs = self.rhs if isinstance(
-            self.rhs, str) else str(execute(ctx, self.rhs).value)
+            self.rhs, str) else execute(ctx, self.rhs).value
         return lhs[rhs]
 
 
 @dataclass
+class Not(UnaryOp):
+    __op__: ClassVar[Callable] = invert
+
+
+@dataclass
 class Sum(BinaryOp):
-    name: ClassVar[str] = 'sum'
+    __op__: ClassVar[Callable] = add
 
 
 @dataclass
 class Sub(BinaryOp):
-    name: ClassVar[str] = 'sub'
+    __op__: ClassVar[Callable] = sub
 
 
 @dataclass
 class Mul(BinaryOp):
-    name: ClassVar[str] = 'mul'
+    __op__: ClassVar[Callable] = mul
 
 
 @dataclass
 class Div(BinaryOp):
-    name: ClassVar[str] = 'div'
+    __op__: ClassVar[Callable] = truediv
 
 
 @dataclass
 class And(BinaryOp):
-    name: ClassVar[str] = 'and'
+    __op__: ClassVar[Callable] = and_
 
 
 @dataclass
 class Or(BinaryOp):
-    name: ClassVar[str] = 'or'
-
-
-@dataclass
-class Not(UnaryOp):
-    name: ClassVar[str] = 'not'
+    __op__: ClassVar[Callable] = or_
 
 
 @dataclass
 class Eq(BinaryOp):
-    name: ClassVar[str] = 'eq'
+    @staticmethod
+    def __op__(lhs, rhs):
+        return Bool(lhs == rhs)
 
 
 @dataclass
 class Neq(BinaryOp):
-    name: ClassVar[str] = 'neq'
+    @staticmethod
+    def __op__(lhs, rhs):
+        return Bool(lhs != rhs)
 
 
 @dataclass
 class Gt(BinaryOp):
-    name: ClassVar[str] = 'gt'
+    __op__: ClassVar[Callable] = gt
 
 
 @dataclass
 class Ge(BinaryOp):
-    name: ClassVar[str] = 'ge'
+    __op__: ClassVar[Callable] = ge
 
 
 @dataclass
 class Lt(BinaryOp):
-    name: ClassVar[str] = 'lt'
+    __op__: ClassVar[Callable] = lt
 
 
 @dataclass
 class Le(BinaryOp):
-    name: ClassVar[str] = 'le'
+    __op__: ClassVar[Callable] = le

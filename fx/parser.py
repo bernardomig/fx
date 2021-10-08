@@ -1,14 +1,25 @@
 
+from lark import Lark
+from lark import Transformer as LarkTransformer
+from lark.exceptions import UnexpectedEOF
+
 from fx.exceptions import SyntaxError
-from inspect import indentsize
-from lark import Lark, Transformer as LarkTransformer
-from lark.exceptions import UnexpectedEOF, UnexpectedInput
-from .ast import And, Call, Div, Eq, Ge, Get, Gt, Lambda, Le, Lt, Mul, Neq, Not, Or, Record, Sub, Sum, Value, Variable, Array
+
+from .ast import (And, Array, Div, Eq, FnCall, Ge, Get, Gt, If, Lambda, Le,
+                  Let, Literal, Lt, Mul, Neq, Not, Or, Record, Sub, Sum,
+                  Variable, When)
+from .value import Bool, Float, Int, Nil, String
 
 GRAMMAR = R"""
 ?start: expr
 
-?expr: logic
+?expr: let | if_ | when | logic
+
+let: "let" (ident "=" expr) ("and" ident "=" expr)* "in" expr
+
+if_: "if" expr "then" expr "else" expr
+
+when: "when" expr ("is" expr "->" expr)+ ("default" "->" expr)?
 
 ?logic: eq
     | logic "&" eq -> and_
@@ -39,14 +50,14 @@ GRAMMAR = R"""
 
 ?atom: value | variable | call | "(" expr ")" 
 
-call: (variable | get) "(" args? (";" kwargs)?  ")"
+call: (variable | get) "(" args? ")"
 
 variable: ident
 
 ?value: boolean | string | int | float | nil
     | array | record | lambda_
 
-lambda_: "[" defargs? (";" defkwargs)? "]" "->" expr
+lambda_: "fn" "(" defargs? ")" "->" expr
 
 record: "[" kwargs "]"
 
@@ -56,7 +67,6 @@ args: (expr ("," expr)*)
 kwargs: ((ident ":" expr) ("," (ident ":" expr))*)
 
 defargs: (ident ("," ident)*)
-defkwargs: ((ident ":" expr) ("," (ident ":" expr))*)
 
 nil: "nil"
 int: /[+-]?[0-9]+/
@@ -80,26 +90,26 @@ class Transformer(LarkTransformer):
 
     def float(self, s):
         s, = s
-        return Value[float](float(s))
+        return Literal(Float(float(s)))
 
     def int(self, s):
         s, = s
-        return Value[int](int(s))
+        return Literal(Int(int(s)))
 
     def string(self, s):
         s, = s
         value = str(s)
         value = value[1:-1]
-        return Value[str](value)
+        return Literal(String(value))
 
-    def true(self, s):
-        return Value[bool](True)
+    def true(self, _s):
+        return Literal(Bool(True))
 
-    def false(self, s):
-        return Value[bool](False)
+    def false(self, _s):
+        return Literal(Bool(False))
 
     def nil(self, s):
-        return Value[None](None)
+        return Literal(Nil())
 
     def args(self, s):
         return s
@@ -117,43 +127,32 @@ class Transformer(LarkTransformer):
         return self.kwargs(s)
 
     def array(self, s):
-        return Array(items=s[0] if len(s) > 0 else [])
+        arr = s[0] if len(s) > 0 else []
+        return Array(items=arr)
 
     def record(self, s):
         s, = s
-        return Record(entries=s)
+        return Record(s)
 
     def variable(self, s):
         s, = s
         return Variable(ident=s)
 
     def call(self, s):
-        name, *args = s
-        if len(args) == 0:
-            return Call(name=name)
-        elif len(args) == 2:
-            return Call(name=name,
-                        args=args[0],
-                        kwargs=args[1])
-        elif len(args) == 1:
-            args = args[0]
-            if isinstance(args, list):
-                return Call(name=name, args=args)
-            else:
-                return Call(name=name, kwargs=args)
+        if len(s) == 1:
+            name, = s
+            return FnCall(name)
+        else:
+            name, args = s
+            return FnCall(name, args)
 
     def lambda_(self, s):
-        *args, body = s
-        if len(args) == 0:
-            return Lambda(body=body)
-        elif len(args) == 2:
-            return Lambda(body=body, args=args[0], kwargs=args[1])
+        if len(s) == 1:
+            body, = s
+            return Lambda(body)
         else:
-            args = args[0]
-            if isinstance(args, list):
-                return Lambda(body=body, args=args)
-            else:
-                return Lambda(body=body, kwargs=args)
+            args, body = s
+            return Lambda(body=body, args=args)
 
     def get(self, s):
         lhs, rhs = s
@@ -176,8 +175,8 @@ class Transformer(LarkTransformer):
         return Div(lhs, rhs)
 
     def not_(self, s):
-        s, = s
-        return Not(s)
+        arg, = s
+        return Not(arg)
 
     def and_(self, s):
         lhs, rhs = s
@@ -210,6 +209,29 @@ class Transformer(LarkTransformer):
     def le(self, s):
         lhs, rhs = s
         return Le(lhs, rhs)
+
+    def let(self, s):
+        *assignments, body = s
+        assignments = list(zip(assignments[::2], assignments[1::2]))
+        return Let(assignments, body)
+
+    def if_(self, s):
+        cond, true, false = s
+        return If(cond, true, false)
+
+    def when(self, s):
+        value, *others = s
+
+        matches = []
+        default = None
+        while len(others) > 0:
+            if len(others) == 1:
+                default, *others = others
+            else:
+                cond, branch, *others = others
+                matches.append((cond, branch))
+
+        return When(value, matches, default)
 
 
 PARSER = Lark(grammar=GRAMMAR)
