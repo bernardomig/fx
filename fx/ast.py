@@ -1,25 +1,19 @@
 from dataclasses import dataclass, field
-from operator import (add, and_, eq, ge, getitem, gt, invert, le, lt, mul, ne,
+from operator import (add, and_, eq, ge, getitem, gt, invert, le, lt, mul, ne, not_,
                       or_, sub, truediv)
-from typing import Callable, ClassVar, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, ClassVar, Dict, List, NewType, Optional, Tuple, Type, Union
 
-from _pytest.python import Class
+from .context import Context, Scope
 
-from .context import Context
-from .value import Array as ValueArray
-from .value import Bool, Float, Int
-from .value import Lambda as ValueLambda
-from .value import Nil
-from .value import Record as ValueRecord
-from .value import Value, wrap
+Value = NewType('Value', Any)
 
 
 class Ast:
-    def execute(self, _ctx: Context) -> Value:
+    def execute(self, _ctx: Context):
         raise NotImplementedError()
 
 
-def execute(ctx: Context, ast: Ast) -> Value:
+def execute(ctx: Context, ast: Ast):
     return ast.execute(ctx)
 
 
@@ -27,7 +21,7 @@ def execute(ctx: Context, ast: Ast) -> Value:
 class Literal(Ast):
     value: Value
 
-    def execute(self, _ctx: Context) -> Value:
+    def execute(self, _ctx: Context):
         return self.value
 
 
@@ -35,24 +29,24 @@ class Literal(Ast):
 class Array(Ast):
     items: List[Ast]
 
-    def execute(self, ctx: Context) -> Value:
-        return ValueArray(*[execute(ctx, v) for v in self.items])
+    def execute(self, ctx: Context):
+        return [execute(ctx, v) for v in self.items]
 
 
 @dataclass
 class Record(Ast):
     items: Dict[str, Ast]
 
-    def execute(self, ctx: Context) -> Value:
-        return ValueRecord(**{k: execute(ctx, v) for k, v in self.items.items()})
+    def execute(self, ctx: Context):
+        return {k: execute(ctx, v) for k, v in self.items.items()}
 
 
 @dataclass
 class Variable(Ast):
     ident: str
 
-    def execute(self, ctx: Context) -> Value:
-        return ctx.scope[self.ident]
+    def execute(self, ctx: Context):
+        return ctx[self.ident]
 
 
 @dataclass
@@ -60,7 +54,7 @@ class FnCall(Ast):
     name: Ast
     args: List[Ast] = field(default_factory=list)
 
-    def execute(self, ctx: Context) -> Value:
+    def execute(self, ctx: Context):
         fn = self.name.execute(ctx)
         args = [arg.execute(ctx) for arg in self.args]
         return fn(*args)
@@ -71,12 +65,12 @@ class Lambda(Ast):
     body: Ast
     args: List[str] = field(default_factory=list)
 
-    def execute(self, ctx: Context) -> Value:
-        return ValueLambda(ctx, self)
+    def execute(self, ctx: Context):
+        return lambda *args: self(ctx, *args)
 
     def __call__(self, ctx: Context, *args):
         args = {name: arg for name, arg in zip(self.args, args)}
-        ctx = Context({**ctx.scope, **args})
+        ctx = Scope(parent=ctx, scope=args)
         return execute(ctx, self.body)
 
 
@@ -85,9 +79,9 @@ class Let(Ast):
     assignments: List[Tuple[str, Ast]]
     body: Ast
 
-    def execute(self, ctx: Context) -> Value:
+    def execute(self, ctx: Context):
         scope = {k: execute(ctx, v) for k, v in self.assignments}
-        ctx = Context(scope={**ctx.scope, **scope})
+        ctx = Scope(parent=ctx, scope=scope)
         return execute(ctx, self.body)
 
 
@@ -97,9 +91,9 @@ class If(Ast):
     true_branch: Ast
     false_branch: Ast
 
-    def execute(self, ctx: Context) -> Value:
+    def execute(self, ctx: Context):
         cond = execute(ctx, self.condition)
-        assert isinstance(cond, Bool)
+        assert isinstance(cond, bool)
         return (
             execute(ctx, self.true_branch)
             if cond.value
@@ -112,7 +106,7 @@ class When(Ast):
     matches: List[Tuple[Ast, Ast]]
     default: Optional[Ast] = field(default=None)
 
-    def execute(self, ctx: Context) -> Value:
+    def execute(self, ctx: Context):
         value = execute(ctx, self.value)
 
         for compare, body in self.matches:
@@ -123,18 +117,18 @@ class When(Ast):
         if self.default:
             return execute(ctx, self.default)
 
-        return Nil()
+        return None
 
 
 @dataclass
 class UnaryOp(Ast):
     arg: Ast
 
-    def execute(self, ctx: Context) -> Value:
+    def execute(self, ctx: Context):
         arg = self.arg.execute(ctx)
         return self.__op__(arg)
 
-    def __op__(self, value: Value):
+    def __op__(self, value):
         raise NotImplementedError()
 
 
@@ -143,7 +137,7 @@ class BinaryOp(Ast):
     lhs: Ast
     rhs: Ast
 
-    def execute(self, ctx: Context) -> Value:
+    def execute(self, ctx: Context):
         lhs = self.lhs.execute(ctx)
         rhs = self.rhs.execute(ctx)
 
@@ -155,7 +149,7 @@ class Get:
     lhs: Ast
     rhs: Union[str, Ast]
 
-    def execute(self, ctx: Context) -> Value:
+    def execute(self, ctx: Context):
         lhs = execute(ctx, self.lhs)
         rhs = self.rhs if isinstance(
             self.rhs, str) else execute(ctx, self.rhs).value
@@ -164,7 +158,7 @@ class Get:
 
 @dataclass
 class Not(UnaryOp):
-    __op__: ClassVar[Callable] = invert
+    __op__: ClassVar[Callable] = not_
 
 
 @dataclass
@@ -199,16 +193,12 @@ class Or(BinaryOp):
 
 @dataclass
 class Eq(BinaryOp):
-    @staticmethod
-    def __op__(lhs, rhs):
-        return Bool(lhs == rhs)
+    __op__: ClassVar[Callable] = eq
 
 
 @dataclass
 class Neq(BinaryOp):
-    @staticmethod
-    def __op__(lhs, rhs):
-        return Bool(lhs != rhs)
+    __op__: ClassVar[Callable] = ne
 
 
 @dataclass

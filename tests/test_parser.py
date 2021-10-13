@@ -1,76 +1,76 @@
-from fx.exceptions import SyntaxError
-from lark.exceptions import UnexpectedInput
-import pytest
 from math import isnan
 
-from fx.ast import And, Eq, FnCall, Ge, Get, Gt, If, Lambda, Le, Let, Literal, Lt, Mul, Neq, Not, Or, Sub, Sum, Variable, When
-from fx.value import Array, Int, Float, Bool, Nil, Record, String
+import pytest
+from fx.ast import (And, Array, Eq, FnCall, Ge, Get, Gt, If, Lambda, Le, Let, Literal,
+                    Lt, Mul, Neq, Not, Or, Record, Sub, Sum, Variable, When)
+from fx.exceptions import SyntaxError
 from fx.parser import parse
+from lark.exceptions import UnexpectedInput
 
 
 def test_parsing_ints():
-    assert parse("1") == Literal(Int(1))
-    assert parse("12") == Literal(Int(12))
-    assert parse("+12") == Literal(Int(+12))
-    assert parse("-12") == Literal(Int(-12))
-    assert parse("1234567890") == Literal(Int(1234567890))
-    assert parse("-1234567890") == Literal(Int(-1234567890))
+    assert parse("1") == Literal(1)
+    assert parse("12") == Literal(12)
+    assert parse("+12") == Literal(+12)
+    assert parse("-12") == Literal(-12)
+    assert parse("1234567890") == Literal(1234567890)
+    assert parse("-1234567890") == Literal(-1234567890)
 
 
 def test_parsing_floats():
-    assert parse("1.2") == Literal(Float(1.2))
-    assert parse("1.0") == Literal(Float(1.0))
-    assert parse("0.2") == Literal(Float(0.2))
-    assert parse("+0.23") == Literal(Float(0.23))
-    assert parse("-0.23") == Literal(Float(-0.23))
-    assert parse("1.24e1") == Literal(Float(12.4))
-    assert parse(".23e9") == Literal(Float(.23e9))
-    assert parse("+.23e9") == Literal(Float(.23e9))
-    assert parse("-.23e9") == Literal(Float(-0.23e9))
-    assert parse("1.23e22") == Literal(Float(1.23e22))
-    assert parse("inf") == Literal(Float(float('inf')))
-    assert parse("+inf") == Literal(Float(float('inf')))
-    assert parse("-inf") == Literal(Float(float('-inf')))
-    assert isnan(parse('nan').value.value)
+    assert parse("1.2") == Literal(1.2)
+    assert parse("1.0") == Literal(1.0)
+    assert parse("0.2") == Literal(0.2)
+    assert parse("+0.23") == Literal(0.23)
+    assert parse("-0.23") == Literal(-0.23)
+    assert parse("1.24e1") == Literal(12.4)
+    assert parse(".23e9") == Literal(.23e9)
+    assert parse("+.23e9") == Literal(.23e9)
+    assert parse("-.23e9") == Literal(-0.23e9)
+    assert parse("1.23e22") == Literal(1.23e22)
+    assert parse("inf") == Literal(float('inf'))
+    assert parse("+inf") == Literal(float('inf'))
+    assert parse("-inf") == Literal(float('-inf'))
+    assert isnan(parse('nan').value)
 
 
 def test_parsing_booleans():
-    assert parse("true") == Literal(Bool(True))
-    assert parse("false") == Literal(Bool(False))
+    assert parse("true") == Literal(True)
+    assert parse("false") == Literal(False)
 
 
 def test_parsing_strings():
-    assert parse('""') == Literal(String(""))
-    assert parse('"hello"') == Literal(String("hello"))
-    assert parse('"çâáñ$@"') == Literal(String("çâáñ$@"))
+    assert parse('""') == Literal("")
+    assert parse('"hello"') == Literal("hello")
+    assert parse('"çâáñ$@"') == Literal("çâáñ$@")
 
 
 def test_parsing_nil():
-    assert parse('nil') == Literal(Nil())
+    assert parse('nil') == Literal(None)
 
 
 def test_parsing_arrays():
-    assert parse('[]') == Literal(Array())
-    assert parse('[1, 2, 3, 4]') == Literal(
-        Array(Literal(Int(1)), Literal(Int(2)), Literal(Int(3)), Literal(Int(4))))
-    assert parse('["a", true, 1, 1.23, nil]') == Literal(Array(
-        Literal(String("a")), Literal(Bool(True)), Literal(Int(1)), Literal(Float(1.23)), Literal(Nil())))
+    assert parse('[]') == Array(items=[])
+    assert parse('[1, 2, 3, 4]') == Array(
+        items=[Literal(1), Literal(2), Literal(3), Literal(4)])
+    assert parse('["a", true, 1, 1.23, nil]') == Array(items=[
+        Literal("a"), Literal(True), Literal(1), Literal(1.23), Literal(None)])
 
 
 def test_parsing_records():
-    assert parse('[a: 1, b: 2]') == Record(
-        a=Literal(Int(1)), b=Literal(Int(2)))
+    assert parse('[a: 1, b: 2]') == \
+        Record(items=dict(a=Literal(1), b=Literal(2)))
 
 
 def test_parsing_lambdas():
     assert parse('fn() -> sum(1, 2)') == \
         Lambda(body=FnCall(Variable('sum'),
-                           args=[Literal(Int(1)), Literal(Int(2))]))
+                           args=[Literal(1), Literal(2)]))
 
     assert parse('fn(x) -> `*`(2., sqrt(x))') == Lambda(
         args=['x'],
         body=FnCall(Variable('*'),
-                    args=[Literal(Float(2.)), FnCall(Variable('sqrt'), args=[Variable('x')])]))
+                    args=[Literal(2.), FnCall(Variable('sqrt'), args=[Variable('x')])]))
 
     assert parse('fn(x, y, z) -> sum(x, y, z)') == Lambda(
         args=['x', 'y', 'z'],
@@ -92,36 +92,36 @@ def test_parsing_variables():
 def test_parsing_function_calls():
     assert parse('time_now()') == FnCall(Variable('time_now'))
     assert parse('sum(1, 2)') == FnCall(
-        name=Variable("sum"), args=[Literal(Int(1)), Literal(Int(2))])
+        name=Variable("sum"), args=[Literal(1), Literal(2)])
     assert parse('`+`(1, 2)') == FnCall(name=Variable('+'),
-                                        args=[Literal(Int(1)), Literal(Int(2))])
+                                        args=[Literal(1), Literal(2)])
 
 
 def test_parsing_sum():
-    assert parse('1 + 2') == Sum(Literal(Int(1)), Literal(Int(2)))
+    assert parse('1 + 2') == Sum(Literal(1), Literal(2))
     assert parse(
-        '1 + 2 + 3') == Sum(Sum(Literal(Int(1)), Literal(Int(2))), Literal(Int(3)))
+        '1 + 2 + 3') == Sum(Sum(Literal(1), Literal(2)), Literal(3))
 
 
 def test_parsing_mul():
-    assert parse('1 * 2') == Mul(Literal(Int(1)), Literal(Int(2)))
+    assert parse('1 * 2') == Mul(Literal(1), Literal(2))
 
 
 def test_operator_precedence():
-    assert parse('1 * 2 + 3') == Sum(Mul(Literal(Int(1)),
-                                         Literal(Int(2))), Literal(Int(3)))
+    assert parse('1 * 2 + 3') == Sum(Mul(Literal(1),
+                                         Literal(2)), Literal(3))
     assert parse(
-        '1 + 2 * 3 - 4') == Sub(Sum(Literal(Int(1)), Mul(Literal(Int(2)), Literal(Int(3)))), Literal(Int(4)))
+        '1 + 2 * 3 - 4') == Sub(Sum(Literal(1), Mul(Literal(2), Literal(3))), Literal(4))
 
 
 def test_parenthesis_precedence():
-    assert parse("1 * (3 + 2)") == Mul(Literal(Int(1)),
-                                       Sum(Literal(Int(3)), Literal(Int(2))))
+    assert parse("1 * (3 + 2)") == Mul(Literal(1),
+                                       Sum(Literal(3), Literal(2)))
 
 
 def test_parsing_logical_operators():
-    T = Literal(Bool(True))
-    F = Literal(Bool(False))
+    T = Literal(True)
+    F = Literal(False)
 
     assert parse("true & false") == And(T, F)
     assert parse("!true & false") == And(Not(T), F)
@@ -130,13 +130,13 @@ def test_parsing_logical_operators():
 
 
 def test_parsing_equality_operators():
-    assert parse("1 = 2") == Eq(Literal(Int(1)), Literal(Int(2)))
-    assert parse("1 ~ 2") == Neq(Literal(Int(1)), Literal(Int(2)))
+    assert parse("1 = 2") == Eq(Literal(1), Literal(2))
+    assert parse("1 ~ 2") == Neq(Literal(1), Literal(2))
 
 
 def test_parsing_comparizon_operators():
-    one = Literal(Int(1))
-    two = Literal(Int(2))
+    one = Literal(1)
+    two = Literal(2)
     assert parse("1 > 2") == Gt(one, two)
     assert parse("1 < 2") == Lt(one, two)
     assert parse("1 >= 2") == Ge(one, two)
@@ -153,13 +153,13 @@ def test_parsing_dot_operator():
 
 
 def test_if_parsing():
-    T = Literal(Bool(True))
-    F = Literal(Bool(False))
+    T = Literal(True)
+    F = Literal(False)
 
     assert parse("if true then 1 else 2") == If(
         condition=T,
-        true_branch=Literal(Int(1)),
-        false_branch=Literal(Int(2)))
+        true_branch=Literal(1),
+        false_branch=Literal(2))
 
     assert parse("if true then a else if false then b else c") == If(
         condition=T,
@@ -172,9 +172,9 @@ def test_if_parsing():
 
 
 def test_when_parsing():
-    def i(v): return Literal(Int(v))
-    t = Literal(Bool(True))
-    f = Literal(Bool(False))
+    def i(v): return Literal(v)
+    t = Literal(True)
+    f = Literal(False)
 
     assert parse("when 2 is 2 -> false") == When(
         i(2),
@@ -192,7 +192,7 @@ def test_when_parsing():
 
 
 def test_let_parsing():
-    def i(v): return Literal(Int(v))
+    def i(v): return Literal(v)
     var = Variable
 
     assert parse("let x = 2 in x + 1") ==  \

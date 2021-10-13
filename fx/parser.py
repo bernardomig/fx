@@ -8,7 +8,6 @@ from fx.exceptions import SyntaxError
 from .ast import (And, Array, Div, Eq, FnCall, Ge, Get, Gt, If, Lambda, Le,
                   Let, Literal, Lt, Mul, Neq, Not, Or, Record, Sub, Sum,
                   Variable, When)
-from .value import Bool, Float, Int, Nil, String
 
 GRAMMAR = R"""
 ?start: expr
@@ -90,26 +89,26 @@ class Transformer(LarkTransformer):
 
     def float(self, s):
         s, = s
-        return Literal(Float(float(s)))
+        return Literal(float(s))
 
     def int(self, s):
         s, = s
-        return Literal(Int(int(s)))
+        return Literal(int(s))
 
     def string(self, s):
         s, = s
         value = str(s)
         value = value[1:-1]
-        return Literal(String(value))
+        return Literal(value)
 
     def true(self, _s):
-        return Literal(Bool(True))
+        return Literal(True)
 
     def false(self, _s):
-        return Literal(Bool(False))
+        return Literal(False)
 
     def nil(self, s):
-        return Literal(Nil())
+        return Literal(None)
 
     def args(self, s):
         return s
@@ -132,7 +131,7 @@ class Transformer(LarkTransformer):
 
     def record(self, s):
         s, = s
-        return Record(s)
+        return Record(items=s)
 
     def variable(self, s):
         s, = s
