@@ -46,7 +46,13 @@ class Variable(Ast):
     ident: str
 
     def execute(self, ctx: Context):
-        return ctx[self.ident]
+        if hasattr(ctx, '__getitem__'):
+            return ctx[self.ident]
+        elif hasattr(ctx, self.ident):
+            return getattr(ctx, self.ident)
+        else:
+            raise RuntimeError(
+                f"error getting variable: ctx has no {self.ident} or supports indexation")
 
 
 @dataclass
@@ -96,7 +102,7 @@ class If(Ast):
         assert isinstance(cond, bool)
         return (
             execute(ctx, self.true_branch)
-            if cond.value
+            if cond
             else execute(ctx, self.false_branch))
 
 
@@ -151,9 +157,14 @@ class Get:
 
     def execute(self, ctx: Context):
         lhs = execute(ctx, self.lhs)
-        rhs = self.rhs if isinstance(
-            self.rhs, str) else execute(ctx, self.rhs).value
-        return lhs[rhs]
+        rhs = self.rhs if isinstance(self.rhs, str) else execute(ctx, self.rhs)
+        if hasattr(lhs, '__getitem__'):
+            return lhs[rhs]
+        elif hasattr(lhs, rhs):
+            return getattr(lhs, rhs)
+        else:
+            raise RuntimeError(
+                f"error getting variable: {lhs} has no item {rhs} or supports indexation")
 
 
 @dataclass

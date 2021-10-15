@@ -1,14 +1,31 @@
 
+from pathlib import Path
 from fx.ast import execute
 import readline
-from fx.context import Context
+from fx.context import Context, Scope
 from fx.parser import parse
 from fx.exceptions import SyntaxError
 
 from fx.stdlib import StdLib
 
+import argparse
+
+argparser = argparse.ArgumentParser()
+
+argparser.add_argument('--var', action='append',
+                       type=lambda kv: kv.split("="),
+                       default=[])
+
+args = argparser.parse_args()
+
+args = {
+    key: parse(value).execute({})
+    for key, value in dict(args.var).items()
+}
+
 ctx = {
     **StdLib,
+    **args,
 }
 
 
@@ -29,7 +46,7 @@ n = 1
 while True:
     try:
         read = input("$ ")
-        if read == '':
+        if read.strip() == '':
             continue
         expr = parse(read)
         result = execute(ctx, expr)

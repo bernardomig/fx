@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 import math
 import random
-from operator import getitem
+from operator import getitem, add, sub, mul
 from functools import reduce
 from typing import Optional
 
@@ -81,6 +81,7 @@ Array = dict(
     filter=lambda fn, array: [el for el in array if fn(el)],
     filteri=lambda fn, array: [el for index,
                                el in enumerate(array) if fn(el, index)],
+    reduce=lambda fn, array, init: reduce(fn, array, init),
     all=all,
     any=any,
     sort=sorted,
@@ -98,11 +99,42 @@ JSON = dict(
     parse=lambda value: json.loads(value),
 )
 
+
+def re_match(pattern, value):
+    from re import match
+    return match(pattern, value) is not None
+
+
+def re_extract(pattern, value):
+    from re import search
+
+    ret = search(pattern, value)
+    if ret is not None:
+        return ret.group()
+
+
+Regex = dict(
+    match=re_match,
+    extract=re_extract,
+)
+
+Prelude = {
+    '+': add,
+    '-': sub,
+    '*': mul,
+    '+1': lambda x: x + 1,
+    'succ': lambda x: x + 1,
+    'apply': lambda fn, args: fn(*args),
+}
+
 StdLib = {
+    'Prelude': Prelude,
     'String': String,
     'Random': Random,
     'Float': Float,
     'Array': Array,
     'Date': Date,
     'JSON': JSON,
+    'Regex': Regex,
+    **Prelude,
 }
