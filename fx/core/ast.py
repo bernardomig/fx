@@ -4,8 +4,6 @@ from functools import partial, partialmethod
 from typing import (Any, Callable, ClassVar, Dict, List, NewType, Optional,
                     Tuple, Union)
 
-from .operations import (add, sub, mul, div, not_,
-                         and_, or_, eq, ne, ge, gt, le, lt)
 
 from fx.core.value import FunctionArg
 
