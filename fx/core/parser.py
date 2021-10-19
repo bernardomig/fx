@@ -3,11 +3,11 @@ from lark import Lark
 from lark import Transformer as LarkTransformer
 from lark.exceptions import UnexpectedEOF
 
-from fx.exceptions import SyntaxError
-
 from .ast import (And, Array, Div, Eq, FnCall, Ge, Get, Gt, If, Lambda, Le,
                   Let, Literal, Lt, Mul, Neq, Not, Or, Record, Sub, Sum,
                   Variable, When)
+from .exceptions import SyntaxError
+from .value import Boolean, Float, Integer, Nil, String
 
 GRAMMAR = R"""
 ?start: expr
@@ -21,8 +21,8 @@ if_: "if" expr "then" expr "else" expr
 when: "when" expr ("is" expr "->" expr)+ ("default" "->" expr)?
 
 ?logic: eq
-    | logic "&" eq -> and_
-    | logic "|" eq -> or_
+    | logic "and" eq -> and_
+    | logic "or" eq -> or_
 
 ?eq: sum
     | eq "=" sum -> eq
@@ -89,26 +89,26 @@ class Transformer(LarkTransformer):
 
     def float(self, s):
         s, = s
-        return Literal(float(s))
+        return Literal(Float(float(s)))
 
     def int(self, s):
         s, = s
-        return Literal(int(s))
+        return Literal(Integer(int(s)))
 
     def string(self, s):
         s, = s
         value = str(s)
         value = value[1:-1]
-        return Literal(value)
+        return Literal(String(value))
 
     def true(self, _s):
-        return Literal(True)
+        return Literal(Boolean(True))
 
     def false(self, _s):
-        return Literal(False)
+        return Literal(Boolean(False))
 
     def nil(self, s):
-        return Literal(None)
+        return Literal(Nil())
 
     def args(self, s):
         return s
@@ -215,8 +215,8 @@ class Transformer(LarkTransformer):
         return Let(assignments, body)
 
     def if_(self, s):
-        cond, true, false = s
-        return If(cond, true, false)
+        condition, true, false = s
+        return If(condition, true, false)
 
     def when(self, s):
         value, *others = s
@@ -227,8 +227,8 @@ class Transformer(LarkTransformer):
             if len(others) == 1:
                 default, *others = others
             else:
-                cond, branch, *others = others
-                matches.append((cond, branch))
+                condition, branch, *others = others
+                matches.append((condition, branch))
 
         return When(value, matches, default)
 
