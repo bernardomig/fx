@@ -21,8 +21,8 @@ if_: "if" expr "then" expr "else" expr
 when: "when" expr ("is" expr "->" expr)+ ("default" "->" expr)?
 
 ?logic: eq
-    | logic "and" eq -> and_
-    | logic "or" eq -> or_
+    | logic "&" eq -> and_
+    | logic "|" eq -> or_
 
 ?eq: sum
     | eq "=" sum -> eq

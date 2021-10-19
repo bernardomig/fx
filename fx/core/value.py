@@ -1,6 +1,6 @@
+from dataclasses import dataclass
 from functools import partial
-from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, Type, Union
+from typing import Callable, Dict, List, Union
 
 from typing_extensions import TypeGuard
 

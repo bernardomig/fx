@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from functools import partialmethod
+from functools import partial, partialmethod
 
 from typing import (Any, Callable, ClassVar, Dict, List, NewType, Optional,
                     Tuple, Union)
@@ -134,31 +134,7 @@ class When(Ast):
 
 
 @dataclass
-class UnaryOp(Ast):
-    arg: Ast
-
-    def execute(self, ctx: Context):
-        arg = self.arg.execute(ctx)
-        return self.__op__(arg)
-
-    def __op__(self, value):
-        raise NotImplementedError()
-
-
-@dataclass
-class BinaryOp(Ast):
-    lhs: Ast
-    rhs: Ast
-
-    def execute(self, ctx: Context):
-        lhs = self.lhs.execute(ctx)
-        rhs = self.rhs.execute(ctx)
-
-        return type(self).__op__(lhs, rhs)
-
-
-@dataclass
-class Get:
+class Get(Ast):
     lhs: Ast
     rhs: Union[str, Ast]
 
@@ -169,65 +145,39 @@ class Get:
 
 
 @dataclass
-class Not(UnaryOp):
-    __op__: ClassVar[Callable] = not_
+class UnaryOp(Ast):
+    op: str
+    arg: Ast
+
+    def execute(self, ctx: Context):
+        fn = ctx[self.op]
+        arg = execute(ctx, self.arg)
+        return fn(arg)
 
 
 @dataclass
-class Sum(BinaryOp):
-    __op__: ClassVar[Callable] = add
+class BinaryOp:
+    op: str
+    lhs: Ast
+    rhs: Ast
+
+    def execute(self, ctx: Context):
+        fn = ctx[self.op]
+        lhs = execute(ctx, self.lhs)
+        rhs = execute(ctx, self.rhs)
+        return fn(lhs, rhs)
 
 
-@dataclass
-class Sub(BinaryOp):
-    __op__: ClassVar[Callable] = sub
-
-
-@dataclass
-class Mul(BinaryOp):
-    __op__: ClassVar[Callable] = mul
-
-
-@dataclass
-class Div(BinaryOp):
-    __op__: ClassVar[Callable] = div
-
-
-@dataclass
-class And(BinaryOp):
-    __op__: ClassVar[Callable] = and_
-
-
-@dataclass
-class Or(BinaryOp):
-    __op__: ClassVar[Callable] = or_
-
-
-@dataclass
-class Eq(BinaryOp):
-    __op__: ClassVar[Callable] = eq
-
-
-@dataclass
-class Neq(BinaryOp):
-    __op__: ClassVar[Callable] = ne
-
-
-@dataclass
-class Gt(BinaryOp):
-    __op__: ClassVar[Callable] = gt
-
-
-@dataclass
-class Ge(BinaryOp):
-    __op__: ClassVar[Callable] = ge
-
-
-@dataclass
-class Lt(BinaryOp):
-    __op__: ClassVar[Callable] = lt
-
-
-@dataclass
-class Le(BinaryOp):
-    __op__: ClassVar[Callable] = le
+Not = partial(UnaryOp, '!')
+Sum = partial(BinaryOp, '+')
+Sub = partial(BinaryOp, '-')
+Mul = partial(BinaryOp, '*')
+Div = partial(BinaryOp, '/')
+And = partial(BinaryOp, '&')
+Or = partial(BinaryOp, '|')
+Eq = partial(BinaryOp, '=')
+Neq = partial(BinaryOp, '~')
+Gt = partial(BinaryOp, '>')
+Ge = partial(BinaryOp, '>=')
+Lt = partial(BinaryOp, '<')
+Le = partial(BinaryOp, '<=')

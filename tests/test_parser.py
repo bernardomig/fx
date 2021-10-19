@@ -131,10 +131,10 @@ def test_parsing_logical_operators():
     T = LitBool(True)
     F = LitBool(False)
 
-    assert parse("true and false") == And(T, F)
-    assert parse("!true and false") == And(Not(T), F)
-    assert parse("true or false") == Or(T, F)
-    assert parse("!true or false") == Or(Not(T), F)
+    assert parse("true & false") == And(T, F)
+    assert parse("!true & false") == And(Not(T), F)
+    assert parse("true | false") == Or(T, F)
+    assert parse("!true | false") == Or(Not(T), F)
 
 
 def test_parsing_equality_operators():
