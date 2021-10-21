@@ -1,14 +1,11 @@
 
 from pathlib import Path
-from fx.ast import execute
 import readline
-from fx.context import Context, Scope
-from fx.parser import parse
-from fx.exceptions import SyntaxError
-
-from fx.stdlib import StdLib
+from fx.core.ast import execute
+from fx.core.parser import parse
 
 import argparse
+
 
 argparser = argparse.ArgumentParser()
 
@@ -24,22 +21,8 @@ args = {
 }
 
 ctx = {
-    **StdLib,
     **args,
 }
-
-
-def repr_value(value):
-    if isinstance(value, str):
-        return '"' + value + '"'
-    elif isinstance(value, (int, float)):
-        return str(value)
-    elif isinstance(value, (bool)):
-        return "true" if value else "false"
-    elif value is None:
-        return 'nil'
-    else:
-        return repr(value)
 
 
 n = 1
@@ -50,7 +33,7 @@ while True:
             continue
         expr = parse(read)
         result = execute(ctx, expr)
-        print(f"[{n}] {repr_value(result)}")
+        print(f"[{n}] {repr(result)}")
     except SyntaxError as e:
         print(f"Syntax Error: {e.what}")
     except (KeyboardInterrupt, EOFError):
