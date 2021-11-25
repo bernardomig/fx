@@ -1,9 +1,7 @@
 
-from pathlib import Path
-import readline
-from fx.core.ast import execute
-from fx.core.parser import parse
-
+import readline as _
+import operator
+from fxlang.core import execute, parse
 import argparse
 
 
@@ -20,8 +18,10 @@ args = {
     for key, value in dict(args.var).items()
 }
 
+
 ctx = {
     **args,
+    **{'+': operator.add, '-': operator.sub, '*': operator.mul, '/': operator.truediv}
 }
 
 
@@ -32,7 +32,7 @@ while True:
         if read.strip() == '':
             continue
         expr = parse(read)
-        result = execute(ctx, expr)
+        result = execute(expr, ctx)
         print(f"[{n}] {repr(result)}")
     except SyntaxError as e:
         print(f"Syntax Error: {e.what}")

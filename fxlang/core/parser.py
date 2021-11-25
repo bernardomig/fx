@@ -6,8 +6,7 @@ from lark.exceptions import UnexpectedEOF
 from .ast import (And, Array, Div, Eq, FnCall, Ge, Get, Gt, If, Lambda, Le,
                   Let, Literal, Lt, Mul, Neq, Not, Or, Record, Sub, Sum,
                   Variable, When)
-from .exceptions import SyntaxError
-from .value import Boolean, Float, Integer, Nil, String
+from .values import Boolean, Float, Integer, Nil, String
 
 GRAMMAR = R"""
 ?start: expr
@@ -93,7 +92,7 @@ class Transformer(LarkTransformer):
 
     def int(self, s):
         s, = s
-        return Literal(Integer(int(s)))
+        return Literal(Integer(s))
 
     def string(self, s):
         s, = s
@@ -116,7 +115,6 @@ class Transformer(LarkTransformer):
     def kwargs(self, s):
         keys = s[::2]
         values = s[1::2]
-
         return {str(key): value for key, value in zip(keys, values)}
 
     def defargs(self, s):
@@ -240,5 +238,5 @@ TRANSFORMER = Transformer()
 def parse(input: str):
     try:
         return TRANSFORMER.transform(PARSER.parse(input))
-    except UnexpectedEOF as error:
+    except UnexpectedEOF:
         raise SyntaxError(input, what="Unexpected EOF")

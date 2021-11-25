@@ -8,58 +8,51 @@ from fx.core.exceptions import SyntaxError
 from fx.core.value import Boolean, Integer, Float, Nil, String
 from lark.exceptions import UnexpectedInput
 
-Lit = Literal
-def LitInt(v): return Lit(Integer(v))
-def LitFloat(v): return Lit(Float(v))
-def LitBool(v): return Lit(Boolean(v))
-def LitStr(v): return Lit(String(v))
-
 
 def test_parsing_ints():
-    assert parse("1") == LitInt(1)
-    assert parse("12") == LitInt(12)
-    assert parse("+12") == LitInt(+12)
-    assert parse("-12") == LitInt(-12)
-    assert parse("1234567890") == LitInt(1234567890)
-    assert parse("-1234567890") == LitInt(-1234567890)
+    assert parse("1") == 1
+    assert parse("12") == 12
+    assert parse("+12") == +12
+    assert parse("-12") == -12
+    assert parse("1234567890") == 1234567890
+    assert parse("-1234567890") == -1234567890
 
 
 def test_parsing_floats():
-    assert parse("1.2") == LitFloat(1.2)
-    assert parse("1.0") == LitFloat(1.0)
-    assert parse("0.2") == LitFloat(0.2)
-    assert parse("+0.23") == LitFloat(0.23)
-    assert parse("-0.23") == LitFloat(-0.23)
-    assert parse("1.24e1") == LitFloat(12.4)
-    assert parse(".23e9") == LitFloat(.23e9)
-    assert parse("+.23e9") == LitFloat(.23e9)
-    assert parse("-.23e9") == LitFloat(-0.23e9)
-    assert parse("1.23e22") == LitFloat(1.23e22)
-    assert parse("inf") == LitFloat(float('inf'))
-    assert parse("+inf") == LitFloat(float('inf'))
-    assert parse("-inf") == LitFloat(float('-inf'))
+    assert parse("1.2") == 1.2
+    assert parse("1.0") == 1.0
+    assert parse("0.2") == 0.2
+    assert parse("+0.23") == 0.23
+    assert parse("-0.23") == -0.23
+    assert parse("1.24e1") == 12.4
+    assert parse(".23e9") == .23e9
+    assert parse("+.23e9") == .23e9
+    assert parse("-.23e9") == -0.23e9
+    assert parse("1.23e22") == 1.23e22
+    assert parse("inf") == float('inf')
+    assert parse("+inf") == float('inf')
+    assert parse("-inf") == float('-inf')
     assert isnan(parse('nan').value.value)
 
 
 def test_parsing_booleans():
-    assert parse("true") == LitBool(True)
-    assert parse("false") == LitBool(False)
+    assert parse("true") == True
+    assert parse("false") == False
 
 
 def test_parsing_strings():
-    assert parse('""') == LitStr("")
-    assert parse('"hello"') == LitStr("hello")
-    assert parse('"çâáñ$@"') == LitStr("çâáñ$@")
+    assert parse('""') == ""
+    assert parse('"hello"') == "hello"
+    assert parse('"çâáñ$@"') == "çâáñ$@"
 
 
 def test_parsing_nil():
-    assert parse('nil') == Literal(Nil())
+    assert parse('nil') == Nil()
 
 
 def test_parsing_arrays():
     assert parse('[]') == Array(items=[])
-    assert parse('[1, 2, 3, 4]') == Array(
-        items=[LitInt(1), LitInt(2), LitInt(3), LitInt(4)])
+    assert parse('[1, 2, 3, 4]') == Array([1, 2, 3, 4])
     assert parse('["a", true, 1, 1.23, nil]') == Array(items=[
         LitStr("a"), LitBool(True), LitInt(1), LitFloat(1.23), Lit(Nil())])
 

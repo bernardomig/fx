@@ -1,12 +1,14 @@
 [tool.poetry]
-name = "fx"
+name = "fxlang"
 version = "0.1.0"
 description = ""
 authors = ["Bernardo Lourenço <bernardo.martins.lourenco@everis.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.7"
 lark = "^0.11.3"
+printree = "^0.2.0"
+typing-extensions = "^4.0.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.5"
