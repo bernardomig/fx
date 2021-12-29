@@ -31,7 +31,6 @@ when: "when" expr ("is" expr "->" expr)+ ("default" "->" expr)?
     | eq "<" sum -> lt
     | eq "<=" sum -> le
 
-
 ?sum: product
     | sum "+" product -> sum 
     | sum "-" product -> sub
@@ -236,7 +235,4 @@ TRANSFORMER = Transformer()
 
 
 def parse(input: str):
-    try:
-        return TRANSFORMER.transform(PARSER.parse(input))
-    except UnexpectedEOF:
-        raise SyntaxError(input, what="Unexpected EOF")
+    return TRANSFORMER.transform(PARSER.parse(input))

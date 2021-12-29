@@ -1,7 +1,7 @@
 from functools import singledispatch
 
 from .values import Value
-from .ast import Ast, BinaryOp, FnCall, Get, Let, Literal, Array, Record, UnaryOp, Variable
+from .ast import Ast, BinaryOp, FnCall, Get, If, Let, Literal, Array, Record, UnaryOp, Variable
 from .environment import Environment
 
 
@@ -38,7 +38,7 @@ def _(node: FnCall, env: Environment) -> Value:
 
 
 @execute.register
-def _(node: Let, env: Environment) -> Value:
+def _(node: If, env: Environment) -> Value:
     cond = execute(node.condition, env)
     if bool(cond):
         return execute(node.true_branch, env)
